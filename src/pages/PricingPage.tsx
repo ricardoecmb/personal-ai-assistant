@@ -3,10 +3,6 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
   Clock, 
-  Check, 
-  X, 
-  Zap, 
-  Crown, 
   ArrowRight,
   MessageSquare,
   Mail,
@@ -17,54 +13,49 @@ import {
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import PricingCard from '../components/payments/PricingCard'
+import { useAuth } from '../contexts/AuthContext'
 
 const PricingPage: React.FC = () => {
   const [isAnnual, setIsAnnual] = useState(false)
+  const { profile } = useAuth()
 
   const plans = [
     {
       name: 'Gratuito',
       description: 'Perfeito para começar',
       price: { monthly: 0, annual: 0 },
-      icon: <MessageSquare className="h-8 w-8" />,
-      color: 'text-gray-600',
-      bgColor: 'bg-gray-50',
-      borderColor: 'border-gray-200',
+      priceId: { monthly: '', annual: '' },
       features: [
-        { name: 'WhatsApp integrado', included: true },
-        { name: 'Até 50 comandos/mês', included: true },
-        { name: 'Gmail básico', included: true },
-        { name: 'Calendário básico', included: true },
-        { name: 'Suporte por email', included: true },
-        { name: 'Notion integração', included: false },
-        { name: 'Comandos ilimitados', included: false },
-        { name: 'Suporte prioritário', included: false },
-        { name: 'Integrações avançadas', included: false }
+        'WhatsApp integrado',
+        'Até 50 comandos/mês',
+        'Gmail básico',
+        'Calendário básico',
+        'Suporte por email'
       ],
-      cta: 'Começar Grátis',
-      popular: false
+      isCurrentPlan: profile?.plan === 'free'
     },
     {
       name: 'Premium',
       description: 'Para máxima produtividade',
       price: { monthly: 29.90, annual: 299.90 },
-      icon: <Crown className="h-8 w-8" />,
-      color: 'text-primary-600',
-      bgColor: 'bg-primary-50',
-      borderColor: 'border-primary-200',
+      priceId: { 
+        monthly: 'price_1234567890', // Replace with actual Stripe price IDs
+        annual: 'price_0987654321' 
+      },
       features: [
-        { name: 'WhatsApp integrado', included: true },
-        { name: 'Comandos ilimitados', included: true },
-        { name: 'Gmail completo', included: true },
-        { name: 'Calendário avançado', included: true },
-        { name: 'Notion completo', included: true },
-        { name: 'Slack integração', included: true },
-        { name: 'Pesquisa web', included: true },
-        { name: 'Suporte prioritário', included: true },
-        { name: 'LinkedIn scraping', included: true }
+        'WhatsApp integrado',
+        'Comandos ilimitados',
+        'Gmail completo',
+        'Calendário avançado',
+        'Notion completo',
+        'Slack integração',
+        'Pesquisa web',
+        'Suporte prioritário',
+        'LinkedIn scraping'
       ],
-      cta: 'Começar Teste Grátis',
-      popular: true
+      isPopular: true,
+      isCurrentPlan: profile?.plan === 'premium'
     }
   ]
 
@@ -188,61 +179,17 @@ const PricingPage: React.FC = () => {
                 initial={{ opacity: 0, y: 50 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: index * 0.1 }}
-                className={`relative bg-white rounded-2xl shadow-lg border-2 ${
-                  plan.popular ? 'border-primary-200 ring-4 ring-primary-100' : 'border-gray-200'
-                } p-8 ${plan.popular ? 'transform scale-105' : ''}`}
               >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-primary-600 text-white px-4 py-1 rounded-full text-sm font-medium">
-                      Mais Popular
-                    </span>
-                  </div>
-                )}
-
-                <div className="text-center mb-8">
-                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${plan.bgColor} ${plan.color} mb-4`}>
-                    {plan.icon}
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                  <p className="text-gray-600 mb-4">{plan.description}</p>
-                  <div className="mb-6">
-                    <span className="text-4xl font-bold text-gray-900">
-                      R$ {isAnnual ? plan.price.annual : plan.price.monthly}
-                    </span>
-                    {plan.price.monthly > 0 && (
-                      <span className="text-gray-600">
-                        /{isAnnual ? 'ano' : 'mês'}
-                      </span>
-                    )}
-                  </div>
-                  <Link
-                    to="/register"
-                    className={`w-full inline-flex justify-center items-center px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                      plan.popular
-                        ? 'bg-primary-600 hover:bg-primary-700 text-white shadow-lg hover:shadow-xl'
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-                    }`}
-                  >
-                    {plan.cta}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </div>
-
-                <div className="space-y-4">
-                  {plan.features.map((feature, featureIndex) => (
-                    <div key={featureIndex} className="flex items-center space-x-3">
-                      {feature.included ? (
-                        <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
-                      ) : (
-                        <X className="h-5 w-5 text-gray-300 flex-shrink-0" />
-                      )}
-                      <span className={`text-sm ${feature.included ? 'text-gray-900' : 'text-gray-400'}`}>
-                        {feature.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <PricingCard
+                  name={plan.name}
+                  description={plan.description}
+                  price={plan.price}
+                  priceId={plan.priceId}
+                  features={plan.features}
+                  isPopular={plan.isPopular}
+                  isCurrentPlan={plan.isCurrentPlan}
+                  isAnnual={isAnnual}
+                />
               </motion.div>
             ))}
           </div>

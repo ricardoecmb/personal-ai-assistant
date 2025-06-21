@@ -10,88 +10,122 @@ import {
   Calendar, 
   FileText,
   Crown,
-  CheckCircle,
-  XCircle,
   BarChart3,
   Zap,
-  Shield,
-  CreditCard,
-  Bell,
-  Smartphone,
   Link as LinkIcon,
-  AlertTriangle
+  AlertTriangle,
+  Smartphone,
+  Copy,
+  ExternalLink
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useIntegrations } from '../hooks/useIntegrations'
+import { useUsageStats } from '../hooks/useUsageStats'
+import StatsCard from '../components/dashboard/StatsCard'
+import ActivityFeed from '../components/dashboard/ActivityFeed'
+import IntegrationCard from '../components/integrations/IntegrationCard'
+import LoadingSpinner from '../components/ui/LoadingSpinner'
+import toast from 'react-hot-toast'
 
 const DashboardPage: React.FC = () => {
-  const { user, logout, updateUser } = useAuth()
+  const { user, profile, signOut, updateProfile, loading: authLoading } = useAuth()
+  const { integrations, loading: integrationsLoading } = useIntegrations()
+  const { stats, activities, loading: statsLoading } = useUsageStats()
   const [activeTab, setActiveTab] = useState('overview')
 
-  if (!user) return null
+  if (authLoading || !user || !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    )
+  }
 
-  const isFreePlan = user.plan === 'free'
-  const daysLeft = user.planExpiry ? Math.ceil((user.planExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0
+  const isFreePlan = profile.plan === 'free'
+  const planExpiresAt = profile.plan_expires_at ? new Date(profile.plan_expires_at) : null
+  const daysLeft = planExpiresAt ? Math.ceil((planExpiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0
 
-  const integrations = [
+  const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER || '+5511999999999'
+  const activationCode = `CHRONUS-${user.id.slice(0, 8).toUpperCase()}`
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast.success('Copiado para a área de transferência!')
+  }
+
+  const integrationsList = [
     {
       name: 'Gmail',
-      key: 'gmail' as keyof typeof user.integrations,
+      key: 'gmail' as const,
       icon: <Mail className="h-6 w-6" />,
       description: 'Gerencie seus emails através do WhatsApp',
       color: 'text-red-500',
-      bgColor: 'bg-red-50'
+      bgColor: 'bg-red-50',
+      enabled: integrations?.gmail_enabled || false,
+      connected: !!integrations?.gmail_token,
+      isPremium: false
     },
     {
       name: 'Google Calendar',
-      key: 'calendar' as keyof typeof user.integrations,
+      key: 'calendar' as const,
       icon: <Calendar className="h-6 w-6" />,
       description: 'Agende e consulte compromissos',
       color: 'text-blue-500',
-      bgColor: 'bg-blue-50'
+      bgColor: 'bg-blue-50',
+      enabled: integrations?.calendar_enabled || false,
+      connected: !!integrations?.calendar_token,
+      isPremium: false
     },
     {
       name: 'Notion',
-      key: 'notion' as keyof typeof user.integrations,
+      key: 'notion' as const,
       icon: <FileText className="h-6 w-6" />,
       description: 'Gerencie tarefas e projetos',
       color: 'text-gray-700',
-      bgColor: 'bg-gray-50'
+      bgColor: 'bg-gray-50',
+      enabled: integrations?.notion_enabled || false,
+      connected: !!integrations?.notion_token,
+      isPremium: true
     },
     {
-      name: 'WhatsApp',
-      key: 'whatsapp' as keyof typeof user.integrations,
+      name: 'Slack',
+      key: 'slack' as const,
       icon: <MessageSquare className="h-6 w-6" />,
-      description: 'Seu assistente pessoal',
-      color: 'text-green-500',
-      bgColor: 'bg-green-50'
+      description: 'Integração com Slack',
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-50',
+      enabled: integrations?.slack_enabled || false,
+      connected: !!integrations?.slack_token,
+      isPremium: true
     }
   ]
 
-  const stats = [
-    { name: 'Comandos este mês', value: isFreePlan ? '23/50' : '247', icon: <Zap className="h-5 w-5" /> },
-    { name: 'Emails processados', value: '156', icon: <Mail className="h-5 w-5" /> },
-    { name: 'Eventos criados', value: '12', icon: <Calendar className="h-5 w-5" /> },
-    { name: 'Tarefas gerenciadas', value: '89', icon: <FileText className="h-5 w-5" /> }
-  ]
-
-  const toggleIntegration = (key: keyof typeof user.integrations) => {
-    if (isFreePlan && key === 'notion') {
-      alert('Notion está disponível apenas no plano Premium')
-      return
+  const statsData = [
+    { 
+      name: 'Comandos este mês', 
+      value: isFreePlan ? `${stats?.commands_used || 0}/50` : (stats?.commands_used || 0).toString(), 
+      icon: <Zap className="h-5 w-5" />,
+      trend: { value: 12, isPositive: true }
+    },
+    { 
+      name: 'Emails processados', 
+      value: stats?.emails_processed || 0, 
+      icon: <Mail className="h-5 w-5" />,
+      trend: { value: 8, isPositive: true }
+    },
+    { 
+      name: 'Eventos criados', 
+      value: stats?.events_created || 0, 
+      icon: <Calendar className="h-5 w-5" />,
+      trend: { value: 15, isPositive: true }
+    },
+    { 
+      name: 'Tarefas gerenciadas', 
+      value: stats?.tasks_managed || 0, 
+      icon: <FileText className="h-5 w-5" />,
+      trend: { value: 5, isPositive: false }
     }
-    
-    updateUser({
-      integrations: {
-        ...user.integrations,
-        [key]: !user.integrations[key]
-      }
-    })
-  }
-
-  const handleUpgrade = () => {
-    updateUser({ plan: 'premium' })
-    alert('Plano atualizado com sucesso!')
-  }
+  ]
 
   const tabs = [
     { id: 'overview', name: 'Visão Geral', icon: <BarChart3 className="h-4 w-4" /> },
@@ -115,10 +149,10 @@ const DashboardPage: React.FC = () => {
                 <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
                   <User className="h-4 w-4 text-primary-600" />
                 </div>
-                <span className="text-sm font-medium text-gray-700">{user.name}</span>
+                <span className="text-sm font-medium text-gray-700">{profile.full_name}</span>
               </div>
               <button
-                onClick={logout}
+                onClick={signOut}
                 className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
                 title="Sair"
               >
@@ -145,7 +179,7 @@ const DashboardPage: React.FC = () => {
                 </p>
               </div>
               <button
-                onClick={handleUpgrade}
+                onClick={() => window.location.href = '/pricing'}
                 className="bg-white text-primary-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors"
               >
                 Fazer Upgrade
@@ -186,128 +220,116 @@ const DashboardPage: React.FC = () => {
           {activeTab === 'overview' && (
             <div className="space-y-8">
               {/* Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat, index) => (
-                  <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                        <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                      </div>
-                      <div className="text-primary-600">
-                        {stat.icon}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {statsLoading ? (
+                <div className="flex justify-center py-8">
+                  <LoadingSpinner size="lg" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {statsData.map((stat, index) => (
+                    <StatsCard
+                      key={index}
+                      title={stat.name}
+                      value={stat.value}
+                      icon={stat.icon}
+                      trend={stat.trend}
+                    />
+                  ))}
+                </div>
+              )}
 
-              {/* Recent Activity */}
+              {/* Activity Feed */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Atividade Recente</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <Mail className="h-4 w-4 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Email enviado para João Silva</p>
-                      <p className="text-xs text-gray-500">Há 2 minutos</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Calendar className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Reunião agendada para amanhã</p>
-                      <p className="text-xs text-gray-500">Há 15 minutos</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                      <FileText className="h-4 w-4 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Tarefa adicionada ao Notion</p>
-                      <p className="text-xs text-gray-500">Há 1 hora</p>
-                    </div>
-                  </div>
-                </div>
+                <ActivityFeed activities={activities} />
               </div>
             </div>
           )}
 
           {activeTab === 'integrations' && (
             <div className="space-y-6">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Suas Integrações</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {integrations.map((integration) => (
-                    <div key={integration.key} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-10 h-10 ${integration.bgColor} rounded-lg flex items-center justify-center ${integration.color}`}>
-                            {integration.icon}
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-gray-900">{integration.name}</h4>
-                            <p className="text-sm text-gray-500">{integration.description}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => toggleIntegration(integration.key)}
-                          disabled={isFreePlan && integration.key === 'notion'}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            user.integrations[integration.key] ? 'bg-primary-600' : 'bg-gray-200'
-                          } ${isFreePlan && integration.key === 'notion' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              user.integrations[integration.key] ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      {user.integrations[integration.key] ? (
-                        <div className="flex items-center space-x-2 text-green-600">
-                          <CheckCircle className="h-4 w-4" />
-                          <span className="text-sm">Conectado</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center space-x-2 text-gray-400">
-                          <XCircle className="h-4 w-4" />
-                          <span className="text-sm">Desconectado</span>
-                        </div>
-                      )}
-                      {isFreePlan && integration.key === 'notion' && (
-                        <div className="mt-2 flex items-center space-x-2 text-amber-600">
-                          <Crown className="h-4 w-4" />
-                          <span className="text-sm">Premium</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* WhatsApp Setup */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Configuração do WhatsApp</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                  <Smartphone className="h-5 w-5 text-green-600" />
+                  <span>Configuração do WhatsApp</span>
+                </h3>
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-start space-x-3">
                     <Smartphone className="h-6 w-6 text-green-600 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-green-800 mb-2">Como conectar seu WhatsApp</h4>
-                      <ol className="text-sm text-green-700 space-y-1 list-decimal list-inside">
-                        <li>Adicione o número +55 11 99999-9999 aos seus contatos</li>
-                        <li>Envie uma mensagem com o código: <code className="bg-green-100 px-1 rounded">CHRONUS-{user.id}</code></li>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-green-800 mb-3">Como conectar seu WhatsApp</h4>
+                      <ol className="text-sm text-green-700 space-y-2 list-decimal list-inside">
+                        <li>
+                          Adicione o número{' '}
+                          <span className="font-mono bg-green-100 px-2 py-1 rounded inline-flex items-center space-x-1">
+                            <span>{whatsappNumber}</span>
+                            <button
+                              onClick={() => copyToClipboard(whatsappNumber)}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </span>
+                          {' '}aos seus contatos
+                        </li>
+                        <li>
+                          Envie uma mensagem com o código:{' '}
+                          <span className="font-mono bg-green-100 px-2 py-1 rounded inline-flex items-center space-x-1">
+                            <span>{activationCode}</span>
+                            <button
+                              onClick={() => copyToClipboard(activationCode)}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </span>
+                        </li>
                         <li>Aguarde a confirmação de ativação</li>
                         <li>Comece a usar seu assistente!</li>
                       </ol>
+                      <div className="mt-4 flex space-x-3">
+                        <a
+                          href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(activationCode)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                          <span>Abrir WhatsApp</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Integrations */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Suas Integrações</h3>
+                {integrationsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <LoadingSpinner size="md" />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {integrationsList.map((integration) => (
+                      <IntegrationCard
+                        key={integration.key}
+                        name={integration.name}
+                        key={integration.key}
+                        icon={integration.icon}
+                        description={integration.description}
+                        color={integration.color}
+                        bgColor={integration.bgColor}
+                        enabled={integration.enabled}
+                        connected={integration.connected}
+                        isPremium={integration.isPremium}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -322,8 +344,8 @@ const DashboardPage: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                     <input
                       type="text"
-                      value={user.name}
-                      onChange={(e) => updateUser({ name: e.target.value })}
+                      value={profile.full_name}
+                      onChange={(e) => updateProfile({ full_name: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
                   </div>
@@ -331,7 +353,7 @@ const DashboardPage: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                     <input
                       type="email"
-                      value={user.email}
+                      value={profile.email}
                       disabled
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
                     />
@@ -346,50 +368,25 @@ const DashboardPage: React.FC = () => {
                   <div>
                     <div className="flex items-center space-x-2">
                       <span className="text-lg font-medium text-gray-900">
-                        {user.plan === 'free' ? 'Gratuito' : 'Premium'}
+                        {profile.plan === 'free' ? 'Gratuito' : 'Premium'}
                       </span>
-                      {user.plan === 'premium' && <Crown className="h-5 w-5 text-yellow-500" />}
+                      {profile.plan === 'premium' && <Crown className="h-5 w-5 text-yellow-500" />}
                     </div>
                     <p className="text-sm text-gray-500">
-                      {user.plan === 'free' 
+                      {profile.plan === 'free' 
                         ? `${daysLeft} dias restantes no período gratuito`
                         : 'Acesso completo a todas as funcionalidades'
                       }
                     </p>
                   </div>
-                  {user.plan === 'free' && (
+                  {profile.plan === 'free' && (
                     <button
-                      onClick={handleUpgrade}
+                      onClick={() => window.location.href = '/pricing'}
                       className="btn-primary"
                     >
                       Fazer Upgrade
                     </button>
                   )}
-                </div>
-              </div>
-
-              {/* Notifications */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Notificações</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-gray-900">Confirmações de email</h4>
-                      <p className="text-sm text-gray-500">Receba confirmação quando emails forem enviados</p>
-                    </div>
-                    <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-primary-600">
-                      <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6" />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-gray-900">Lembretes de agenda</h4>
-                      <p className="text-sm text-gray-500">Receba lembretes de compromissos</p>
-                    </div>
-                    <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-primary-600">
-                      <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6" />
-                    </button>
-                  </div>
                 </div>
               </div>
 

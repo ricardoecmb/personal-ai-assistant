@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import PricingPage from './pages/PricingPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import Toast from './components/ui/Toast'
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
               } 
             />
           </Routes>
+          <Toast />
         </div>
       </Router>
     </AuthProvider>
